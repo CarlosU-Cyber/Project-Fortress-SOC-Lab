@@ -63,7 +63,7 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 | **20** | Tier 1 - Prod & Identity | `10.0.20.0/24` | `10.0.20.1` | Phase 3 Core / Target | AD DS, File Server |
 | **30** | Tier 2 - DMZ | `10.0.30.0/24` | `10.0.30.1` | Phase 3 Core / Target | Reverse Proxy, Edge App Server |
 | **40** | Voice/UC Reserved | `10.0.40.0/24` | `10.0.40.1` | Reserved / Future Project | VoIP PBX, SIP Services |
-| **50** | Security Monitoring | `10.0.50.0/24` | `10.0.50.1` | Phase 4 Target | SIEM, Wazuh, Zabbix |
+| **50** | Security Monitoring | `10.0.50.0/24` | `10.0.50.1` | Phase 4 & 5 Target | SIEM, Wazuh, Zabbix |
 | **99** | Backup & Recovery | `10.0.99.0/24` | `10.0.99.1` | Phase 3 Core / Target | Veeam Backup Server |
 
 ### 2. Default Firewall Policy Matrix
@@ -101,9 +101,23 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
     * **Production Note:** In a production enterprise environment, the preferred design would typically use a delegated subdomain of an owned public domain, such as `ad.ufprime.org`.
 * **Phase 3.3 - Remote Operations:** Configuration of a DMZ reverse proxy (`DC1-PROXY-01`) to handle inbound TLS termination and deployment of a WireGuard VPN tunnel endpoint for role-based remote access.
 
-### Phase 4: Telemetry, Logging, & Centralized Monitoring (Future State)
-* Deployment of a centralized SIEM (`DC1-SIEM-01`) and Wazuh host-based monitoring agents to collect firewall and Windows security event logs.
-* Installation of infrastructure monitoring using limited SNMP/WMI polling rules across the firewall matrix to track compute and network capacity.
+### Phase 4: Telemetry Pipeline & Centralized Ingestion (Planned Future State)
+* **SIEM Core Deployment:** Stand up a centralized SIEM console (`DC1-SIEM-01`) in the dedicated Security Monitoring zone.
+* **Log Aggregation:** Configure structured data collection pipelines to parse, ingest, and index core infrastructure logs:
+    * pfSense/Netgate firewall packet filter logs (Syslog)
+    * Windows Security, System, and Application logs via Windows Event Forwarding (WEF/WEC)
+    * VMware vCenter event trails and ESXi audit logs
+    * Veeam backup job results and console access audit trails
+* **Performance Baseline Monitoring:** Implement Zabbix infrastructure polling using restricted SNMP/WMI rules across the firewall matrix to monitor system resource metrics.
+
+### Phase 5: Detection Engineering & Security Operations (Planned Future State)
+* **Endpoint Protection:** Deploy Wazuh host-based monitoring agents across all active servers in Tier 0 and Tier 1.
+* **Detection Mechanics:** Write and test custom detection rules targeting common adversary tradecraft, including:
+    * Failed authentication spikes and brute-force patterns across SSH, RDP, and WinRM
+    * Unauthorized local administrator group additions or service creation events
+    * Suspicious PowerShell execution flags (e.g., encoded command strings)
+    * Lateral movement tracking and inter-VLAN firewall drops
+* **SecOps Artifact Generation:** Document live operational playbooks, structured alert triage case notes, and mock incident reports showing timeline construction, root-cause verification, and remediation workflows.
 
 ---
 
