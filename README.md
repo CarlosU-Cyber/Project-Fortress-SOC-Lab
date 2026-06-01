@@ -1,12 +1,12 @@
 # Project Fortress: Enterprise Systems & Security Operations Lab
 
-![Status](https://img.shields.io/badge/Status-Phase_2.2_Complete-success)
+![Status](https://img.shields.io/badge/Status-Phase_3.1_Complete-success)
 ![Hypervisor](https://img.shields.io/badge/Hypervisor-ESXi_7.0_Ent+-blue)
 ![Management](https://img.shields.io/badge/Management-vCenter_7.0_Std-purple)
-![Firewall](https://img.shields.io/badge/Firewall-pfSense_2.7.2-red)
+![Firewall](https://img.shields.io/badge/Firewall-Netgate_pfSense-red)
 
 ## Overview
-Project Fortress is a segmented, on-premises enterprise infrastructure and security operations lab. Originally conceptualized as a fully virtualized environment, the architecture is evolving into a hybrid physical-and-virtual enterprise footprint. The target architecture utilizes a dedicated physical firewall boundary, centralized hypervisor management, logical network segmentation, and tier-separated identity services to simulate a hardened corporate datacenter environment.
+Project Fortress is a segmented, on-premises enterprise infrastructure and security operations lab. Originally conceptualized as a fully virtualized environment, the architecture is evolving into a hybrid physical-and-virtual enterprise footprint. The current core utilizes a dedicated physical firewall boundary, centralized hypervisor management, logical network segmentation, and a Tier 0 management network to simulate a hardened corporate datacenter environment.
 
 The primary objective is to build a structurally sound foundation for systems administration, network engineering, and security operations workflows—moving from core infrastructure automation to advanced local telemetry collection and centralized monitoring.
 
@@ -14,21 +14,21 @@ The primary objective is to build a structurally sound foundation for systems ad
 
 ## Architecture Evolution: Transition to Physical Routing
 * **Legacy Design:** The initial deployment validated a virtualized pfSense appliance using PCIe NIC passthrough with a documented ESXi ACS compatibility setting.
-* **Architectural Pivot:** To better align with enterprise-style reliability and control-plane separation, the routing boundary is being migrated to a dedicated physical Netgate appliance in Phase 3.1. This separates the compute plane from the routing/security plane and reduces dependency on the ESXi host for firewall and network availability.
+* **Architectural Pivot:** To better align with enterprise-style reliability and control-plane separation, the routing boundary was migrated to a dedicated physical Netgate appliance in Phase 3.1. This separates the compute plane from the routing/security plane and reduces dependency on the ESXi host for firewall and network availability.
 
 ---
 
 ## Physical Hardware & Datacenter Topology
-The lab is anchored by physical switching and compute components connected via high-throughput fiber and direct-attach copper (DAC) backbones. 
+The lab is anchored by physical switching and compute components connected via high-throughput fiber and direct-attach copper (DAC) backbones.
 
 [View full-size Target-State Network Diagram](images/project-fortress-target-state-network.png)
 
-> **Network Diagram Note:** The diagram linked above represents the Phase 3 target-state architecture. The current Phase 2.2 environment remains in pre-migration staging while the physical Netgate firewall and VLAN trunk are implemented.
+> **Network Diagram Note:** The diagram linked above represents the Phase 3 target-state architecture, including active core routing segments and reserved future service zones. The physical Netgate firewall, 10G DAC trunk, pfSense VLAN interfaces, and ESXi VLAN-backed port groups were implemented in Phase 3.1. Workloads in reserved or future zones are not considered active until deployed and validated in their dedicated phases.
 
 * **Compute / Hypervisor:** AMD Ryzen 7 5800X (8-Core) | 64GB DDR4 | VMware ESXi 7.0 (Licensed)
 * **Power Stability:** UPS with Automatic Voltage Regulation (AVR) to mitigate unstable facility power delivery and voltage fluctuations.
 * **Central Management:** VMware vCenter Server Appliance (vCSA) 7.0
-* **Physical Firewall/Perimeter:** Netgate Enterprise Security Appliance *(Phase 3 target / migration in progress)*
+* **Physical Firewall/Perimeter:** Netgate Enterprise Security Appliance running pfSense Plus
 * **Upstream Edge Router:** Ubiquiti UDM-Pro
 * **Secondary Storage Target:** Unraid NAS (192.168.0.10) for long-term retention
 
@@ -44,10 +44,22 @@ The lab is anchored by physical switching and compute components connected via h
 
 ---
 
+## Operational Controls Added in Phase 3.1
+* Physical Netgate/pfSense firewall deployed as the dedicated routing and security boundary.
+* 10G DAC trunk established between the Netgate firewall and ESXi host.
+* pfSense VLAN interfaces created for the core datacenter subnet plan.
+* ESXi `vSwitch-Fortress` and VLAN-backed port groups created for segmented workload placement.
+* ESXi and vCenter management migrated into the Tier 0 management network.
+* Local break-glass management path retained for rollback and recovery during routing changes.
+* pfSense configuration backups exported before and after VLAN/interface changes to support rollback capability.
+
+---
+
 ## Build Logs
 * [Phase 1: Perimeter Foundation](BUILD_LOG_PHASE_1.md)
 * [Phase 2.1: vCenter Deployment & Troubleshooting](BUILD_LOG_PHASE_2.1.md)
 * [Phase 2.2: Infrastructure Automation & Pre-Migration Backup](BUILD_LOG_PHASE_2.2.md)
+* [Phase 3.1: Core Infrastructure & Tier 0 Migration](BUILD_LOG_PHASE_3.1.md)
 
 ---
 
@@ -57,14 +69,15 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 > **Reserved Segment Note:** Some VLANs are pre-provisioned for future standalone projects. Reserved VLANs are included for address planning, firewall object design, and future routing consistency, but their associated workloads are not considered active until implemented and validated in a dedicated project phase.
 
 ### 1. Subnet Matrix
+
 | VLAN ID | Zone Name | Subnet | Gateway | Status | Core Services / Target Virtual Machines |
 |---|---|---|---|---|---|
-| **10** | Tier 0 - Management | `10.0.10.0/24` | `10.0.10.1` | Phase 3 Core / Target | vCenter, Ansible, Jump Box |
-| **20** | Tier 1 - Prod & Identity | `10.0.20.0/24` | `10.0.20.1` | Phase 3 Core / Target | AD DS, File Server |
-| **30** | Tier 2 - DMZ | `10.0.30.0/24` | `10.0.30.1` | Phase 3 Core / Target | Reverse Proxy, Edge App Server |
+| **10** | Tier 0 - Management | `10.0.10.0/24` | `10.0.10.1` | Active / Phase 3.1 Complete | vCenter, ESXi Mgmt, Ansible, Jump Box |
+| **20** | Tier 1 - Prod & Identity | `10.0.20.0/24` | `10.0.20.1` | Routed / Phase 3.2 Identity Pending | AD DS, File Server |
+| **30** | Tier 2 - DMZ | `10.0.30.0/24` | `10.0.30.1` | Routed / Phase 3.3 Target | Reverse Proxy, Edge App Server |
 | **40** | Voice/UC Reserved | `10.0.40.0/24` | `10.0.40.1` | Reserved / Future Project | VoIP PBX, SIP Services |
 | **50** | Security Monitoring | `10.0.50.0/24` | `10.0.50.1` | Phase 4 & 5 Target | SIEM, Wazuh, Zabbix |
-| **99** | Backup & Recovery | `10.0.99.0/24` | `10.0.99.1` | Phase 3 Core / Target | Veeam Backup Server |
+| **99** | Backup & Recovery | `10.0.99.0/24` | `10.0.99.1` | Routed / Backup Migration Pending | Veeam Backup Server |
 
 ### 2. Default Firewall Policy Matrix
 *Default Posture: Implicit Deny. Inter-VLAN traffic is dropped unless explicitly permitted.*
@@ -92,8 +105,8 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 * **Phase 2.1 - Control Plane:** Deployed vCenter Server Appliance (vCSA) 7.0 to handle centralized virtual datacenter orchestration.
 * **Phase 2.2 - Automation & DR:** Utilized VMware PowerCLI to automate VM provisioning. Constructed a Sysprepped Windows Server 2019 "Golden Image" template. Deployed and configured Veeam Backup & Replication within a standalone workgroup to secure the vCenter control plane to an Unraid NAS prior to network migration. Stabilized host hardware using an AVR UPS.
 
-### Phase 3: Physical Core Routing & Identity Services (Target State)
-* **Phase 3.1 - Physical Routing:** Deployment of the physical Netgate firewall and configuration of the `802.1Q VLAN Trunk` to the ESXi hypervisor to enforce default inter-VLAN deny postures.
+### Phase 3: Physical Core Routing & Identity Services (In Progress)
+* **Phase 3.1 - Physical Routing:** Completed deployment of the physical Netgate firewall, 10G DAC trunk to ESXi, pfSense VLAN interfaces, ESXi VLAN-backed port groups, and Tier 0 management migration for ESXi/vCenter.
 * **Phase 3.2 - Identity Services:** Deploy Windows Server 2019 Active Directory Domain Services (AD DS) using the existing Sysprepped golden image baseline.
     * **Internal AD Domain:** `fort.internal`
     * **DNS Transition Note:** `vcenter.home` is a pre-AD management alias hosted upstream on the UDM-Pro. After AD DS deployment, management records will be transitioned or duplicated under the `fort.internal` namespace.
@@ -104,19 +117,19 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 ### Phase 4: Telemetry Pipeline & Centralized Ingestion (Planned Future State)
 * **SIEM Core Deployment:** Stand up a centralized SIEM console (`DC1-SIEM-01`) in the dedicated Security Monitoring zone.
 * **Log Aggregation:** Configure structured data collection pipelines to parse, ingest, and index core infrastructure logs:
-    * pfSense/Netgate firewall packet filter logs (Syslog)
-    * Windows Security, System, and Application logs via Windows Event Forwarding (WEF/WEC)
-    * VMware vCenter event trails and ESXi audit logs
-    * Veeam backup job results and console access audit trails
+    * pfSense/Netgate firewall packet filter logs via Syslog.
+    * Windows Security, System, and Application logs via Windows Event Forwarding (WEF/WEC).
+    * VMware vCenter event trails and ESXi audit logs.
+    * Veeam backup job results and console access audit trails.
 * **Performance Baseline Monitoring:** Implement Zabbix infrastructure polling using restricted SNMP/WMI rules across the firewall matrix to monitor system resource metrics.
 
 ### Phase 5: Detection Engineering & Security Operations (Planned Future State)
 * **Endpoint Protection:** Deploy Wazuh host-based monitoring agents across all active servers in Tier 0 and Tier 1.
 * **Detection Mechanics:** Write and test custom detection rules targeting common adversary tradecraft, including:
-    * Failed authentication spikes and brute-force patterns across SSH, RDP, and WinRM
-    * Unauthorized local administrator group additions or service creation events
-    * Suspicious PowerShell execution flags (e.g., encoded command strings)
-    * Lateral movement tracking and inter-VLAN firewall drops
+    * Failed authentication spikes and brute-force patterns across SSH, RDP, and WinRM.
+    * Unauthorized local administrator group additions or service creation events.
+    * Suspicious PowerShell execution flags, including encoded command strings.
+    * Lateral movement indicators and inter-VLAN firewall drops.
 * **SecOps Artifact Generation:** Document live operational playbooks, structured alert triage case notes, and mock incident reports showing timeline construction, root-cause verification, and remediation workflows.
 
 ---
