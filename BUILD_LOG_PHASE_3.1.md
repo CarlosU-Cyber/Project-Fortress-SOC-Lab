@@ -10,7 +10,7 @@ Phase 3.1 successfully migrated Project Fortress from a pre-migration management
 * **Target Drive:** Samsung 850 EVO 500GB 2.5" SATA SSD.
 * **Health Verification:** Cleaned via Windows `diskpart`. Verified SMART data via CrystalDiskInfo (0 reallocated sectors, 0 uncorrectable errors, 99% Wear Level Count, ~28TB/150TB TBW). Drive health verified at optimal. Replaced SATA cable to remediate historical CRC error flag.
 
-![Netgate Internal Hardware Modification](./images/phase3.1/01-hardware-netgate-ssd-wiring.jpeg)
+![Netgate Internal Hardware Modification](./images/phase3.1/01-hardware-netgate-ssd-wiring.jpg)
 
 * **OS Installation:** Installed pfSense Plus through local serial console access. 
   * Installed CP210x VCP drivers (COM3, 115200 baud) for local serial access.
