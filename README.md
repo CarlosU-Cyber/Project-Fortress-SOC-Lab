@@ -1,14 +1,14 @@
 # Project Fortress: Enterprise Systems & Security Operations Lab
 
-![Status](https://img.shields.io/badge/Status-Phase_3.1_Complete-success)
+![Status](https://img.shields.io/badge/Status-Phase_3.2_Complete-success)
 ![Hypervisor](https://img.shields.io/badge/Hypervisor-ESXi_7.0_Ent+-blue)
 ![Management](https://img.shields.io/badge/Management-vCenter_7.0_Std-purple)
 ![Firewall](https://img.shields.io/badge/Firewall-Netgate_pfSense-red)
 
 ## Overview
-Project Fortress is a segmented, on-premises enterprise infrastructure and security operations lab. Originally conceptualized as a fully virtualized environment, the architecture is evolving into a hybrid physical-and-virtual enterprise footprint. The current core utilizes a dedicated physical firewall boundary, centralized hypervisor management, logical network segmentation, and a Tier 0 management network to simulate a hardened corporate datacenter environment.
+Project Fortress is a segmented, on-premises enterprise infrastructure and security operations lab. Originally conceptualized as a fully virtualized environment, the architecture is evolved into a hybrid physical-and-virtual enterprise footprint. The current core utilizes a dedicated physical firewall boundary, centralized hypervisor management, logical network segmentation, Tier 0 management controls, Active Directory identity services, and a segmented backup pipeline to simulate a hardened corporate datacenter environment.
 
-The primary objective is to build a structurally sound foundation for systems administration, network engineering, and security operations workflows—moving from core infrastructure automation to advanced local telemetry collection and centralized monitoring.
+The primary objective is to build a structurally sound foundation for systems administration, network engineering, and security operations workflows—moving from core infrastructure, identity, and backup operations toward advanced local telemetry collection, centralized monitoring, and detection engineering.
 
 ---
 
@@ -40,7 +40,7 @@ The lab is anchored by physical switching and compute components connected via h
 * Veeam Backup & Replication deployed outside the future AD domain boundary within a standalone workgroup.
 * Unraid NAS configured as an off-host backup repository for management-plane protection.
 * UPS with AVR added to stabilize ESXi host operations under load.
-* **Backup Staging Note:** Veeam is currently staged on the pre-migration management network (`192.168.0.14`) and will move into its designated Backup & Recovery segment during Phase 3 VLAN implementation.
+* **Backup Staging Note:** Veeam was initially staged on the pre-migration management network (`192.168.0.14`) during Phase 2.2, then migrated into the dedicated Backup & Recovery VLAN during Phase 3.2.
 
 ---
 
@@ -55,11 +55,26 @@ The lab is anchored by physical switching and compute components connected via h
 
 ---
 
+## Operational Controls Added in Phase 3.2
+* Active Directory Domain Services deployed under the internal forest root `fort.internal`.
+* Primary and secondary Windows Server 2019 domain controllers deployed for identity and DNS redundancy.
+* Domain controllers treated administratively as Tier 0 identity assets due to their control over authentication, DNS, Kerberos, and domain-wide policy.
+* Baseline OU structure created with PowerShell automation to support GPO targeting, administrative separation, service account organization, and future security group delegation.
+* Dedicated Domain Admin account created to separate standard user activity from directory-level administrative actions.
+* Windows Server 2019 file server deployed with a dedicated data volume for SMB share hosting.
+* File Server Resource Manager installed for future file-screening and data-governance policies.
+* Veeam Backup & Replication migrated into the dedicated Backup & Recovery VLAN (`10.0.99.0/24`) while remaining outside the Active Directory domain.
+* pfSense firewall rules limited Veeam communication to required backup, repository, and management-plane paths.
+* Phase 3.2 infrastructure baseline backup completed for the domain controllers and file server operating system baselines.
+
+---
+
 ## Build Logs
 * [Phase 1: Perimeter Foundation](BUILD_LOG_PHASE_1.md)
 * [Phase 2.1: vCenter Deployment & Troubleshooting](BUILD_LOG_PHASE_2.1.md)
 * [Phase 2.2: Infrastructure Automation & Pre-Migration Backup](BUILD_LOG_PHASE_2.2.md)
 * [Phase 3.1: Core Infrastructure & Tier 0 Migration](BUILD_LOG_PHASE_3.1.md)
+* [Phase 3.2: Identity Services, Resource Sharing, & Segmented Backup Operations](BUILD_LOG_PHASE_3.2.md)
 
 ---
 
@@ -73,11 +88,11 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 | VLAN ID | Zone Name | Subnet | Gateway | Status | Core Services / Target Virtual Machines |
 |---|---|---|---|---|---|
 | **10** | Tier 0 - Management | `10.0.10.0/24` | `10.0.10.1` | Active / Phase 3.1 Complete | vCenter, ESXi Mgmt, Ansible, Jump Box |
-| **20** | Tier 1 - Prod & Identity | `10.0.20.0/24` | `10.0.20.1` | Routed / Phase 3.2 Identity Pending | AD DS, File Server |
+| **20** | Tier 1 - Prod & Identity | `10.0.20.0/24` | `10.0.20.1` | Routed / Phase 3.2 Identity Complete | AD DS, File Server |
 | **30** | Tier 2 - DMZ | `10.0.30.0/24` | `10.0.30.1` | Routed / Phase 3.3 Target | Reverse Proxy, Edge App Server |
 | **40** | Voice/UC Reserved | `10.0.40.0/24` | `10.0.40.1` | Reserved / Future Project | VoIP PBX, SIP Services |
 | **50** | Security Monitoring | `10.0.50.0/24` | `10.0.50.1` | Phase 4 & 5 Target | SIEM, Wazuh, Zabbix |
-| **99** | Backup & Recovery | `10.0.99.0/24` | `10.0.99.1` | Routed / Backup Migration Pending | Veeam Backup Server |
+| **99** | Backup & Recovery | `10.0.99.0/24` | `10.0.99.1` | Active / Phase 3.2 Complete | DC1-VEEAM-01 |
 
 ### 2. Default Firewall Policy Matrix
 *Default Posture: Implicit Deny. Inter-VLAN traffic is dropped unless explicitly permitted.*
@@ -85,13 +100,14 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 | Source Zone | Destination Zone | Allowed Traffic | Purpose |
 |---|---|---|---|
 | Admin Workstation | VLAN 10 Mgmt | HTTPS, SSH, RDP | Controlled core administration |
-| VLAN 10 Mgmt | VLAN 20 Prod | WinRM, SSH, management ports | Automation and server configuration |
-| VLAN 20 Prod | VLAN 10 Mgmt | **Deny by default** | Protect the core management plane |
-| VLAN 20 Prod | VLAN 50 SIEM | Syslog, agent telemetry | Log forwarding and endpoint monitoring |
-| VLAN 50 SIEM | Selected Infrastructure | SNMP, WMI, API polling ports | Health monitoring and structural visibility |
-| VLAN 30 DMZ | VLAN 20 Prod | App-specific ports only | Controlled backend resource mapping |
-| VLAN 99 Backup | VLAN 10 / 20 / 30 | Backup-required VMware API, RPC, SMB ports | Backup job execution and snapshot pulls |
-| VLAN 10 / 20 / 30 | VLAN 99 Backup | **Deny by default** | Ransomware mitigation / Backup vault protection |
+| VLAN 10 Mgmt | VLAN 20 Prod & Identity | WinRM, SSH, management ports | Automation and server configuration |
+| VLAN 20 Prod & Identity | VLAN 10 Mgmt | **Deny by default** | Protect the core management plane |
+| VLAN 99 Backup | VLAN 10 Mgmt | HTTPS, VMware API, NFC / TCP 902 | vCenter and ESXi backup operations |
+| VLAN 99 Backup | Unraid NAS | SMB / TCP 445 | Backup repository access |
+| VLAN 10 / 20 / 30 | VLAN 99 Backup | **Deny by default** | Backup vault protection and ransomware risk reduction |
+| VLAN 20 Prod & Identity | VLAN 50 SIEM | Syslog, Windows Event Forwarding, agent telemetry | Future log forwarding and endpoint monitoring |
+| VLAN 50 SIEM | Selected Infrastructure | SNMP, WMI, API polling ports | Future health monitoring and structural visibility |
+| VLAN 30 DMZ | VLAN 20 Prod & Identity | App-specific ports only | Controlled backend resource mapping |
 | VPN Clients | Selected VLANs | Role-based access only | Remote lab engineering and administration |
 
 ---
@@ -107,9 +123,10 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 
 ### Phase 3: Physical Core Routing & Identity Services (In Progress)
 * **Phase 3.1 - Physical Routing:** Completed deployment of the physical Netgate firewall, 10G DAC trunk to ESXi, pfSense VLAN interfaces, ESXi VLAN-backed port groups, and Tier 0 management migration for ESXi/vCenter.
-* **Phase 3.2 - Identity Services:** Deploy Windows Server 2019 Active Directory Domain Services (AD DS) using the existing Sysprepped golden image baseline.
+* **Phase 3.2 - Identity Services, File Services, & Backup Segmentation:** Completed deployment of the `fort.internal` Active Directory forest, primary and secondary Windows Server 2019 domain controllers, internal DNS, reverse lookup zone, baseline OU structure, dedicated Domain Admin account, Windows file server, SMB share foundation, and Veeam migration into the dedicated Backup & Recovery VLAN.
     * **Internal AD Domain:** `fort.internal`
-    * **DNS Transition Note:** `vcenter.home` is a pre-AD management alias hosted upstream on the UDM-Pro. After AD DS deployment, management records will be transitioned or duplicated under the `fort.internal` namespace.
+    * **Identity Tier Note:** Domain controllers reside in the Production VLAN for this lab phase but are treated administratively as Tier 0 identity assets due to their control over authentication, DNS, Kerberos, and domain-wide policy.
+    * **DNS Transition Note:** `vcenter.home` was retained as the vCenter management alias during the migration to avoid unnecessary PNID, SSO, or certificate disruption. Future management records may be transitioned or duplicated under the `fort.internal` namespace as the domain matures.
     * **Lab Rationale:** `.internal` is used as a private internal namespace for the lab. The shorter `fort.internal` format improves administrative usability while avoiding `.local`, which can conflict with mDNS behavior.
     * **Production Note:** In a production enterprise environment, the preferred design would typically use a delegated subdomain of an owned public domain, such as `ad.ufprime.org`.
 * **Phase 3.3 - Remote Operations:** Configuration of a DMZ reverse proxy (`DC1-PROXY-01`) to handle inbound TLS termination and deployment of a WireGuard VPN tunnel endpoint for role-based remote access.
