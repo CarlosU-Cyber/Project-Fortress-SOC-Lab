@@ -91,7 +91,7 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 | **20** | Tier 1 - Prod & Identity | `10.0.20.0/24` | `10.0.20.1` | Routed / Phase 3.2 Identity Complete | AD DS, File Server |
 | **30** | Tier 2 - DMZ | `10.0.30.0/24` | `10.0.30.1` | Routed / Phase 3.3 Target | Reverse Proxy, Edge App Server |
 | **40** | Voice/UC Reserved | `10.0.40.0/24` | `10.0.40.1` | Reserved / Future Project | VoIP PBX, SIP Services |
-| **50** | Security Monitoring | `10.0.50.0/24` | `10.0.50.1` | Phase 4 & 5 Target | SIEM, Wazuh, Zabbix |
+| **50** | Security Monitoring | `10.0.50.0/24` | `10.0.50.1` | Routed / Phase 4 Services Pending | SIEM, Wazuh, Zabbix |
 | **99** | Backup & Recovery | `10.0.99.0/24` | `10.0.99.1` | Active / Phase 3.2 Complete | DC1-VEEAM-01 |
 
 ### 2. Default Firewall Policy Matrix
@@ -121,7 +121,7 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 * **Phase 2.1 - Control Plane:** Deployed vCenter Server Appliance (vCSA) 7.0 to handle centralized virtual datacenter orchestration.
 * **Phase 2.2 - Automation & DR:** Utilized VMware PowerCLI to automate VM provisioning. Constructed a Sysprepped Windows Server 2019 "Golden Image" template. Deployed and configured Veeam Backup & Replication within a standalone workgroup to secure the vCenter control plane to an Unraid NAS prior to network migration. Stabilized host hardware using an AVR UPS.
 
-### Phase 3: Physical Core Routing & Identity Services (In Progress)
+### Phase 3: Physical Core Routing, Identity Services, & Baseline Hardening (In Progress)
 * **Phase 3.1 - Physical Routing:** Completed deployment of the physical Netgate firewall, 10G DAC trunk to ESXi, pfSense VLAN interfaces, ESXi VLAN-backed port groups, and Tier 0 management migration for ESXi/vCenter.
 * **Phase 3.2 - Identity Services, File Services, & Backup Segmentation:** Completed deployment of the `fort.internal` Active Directory forest, primary and secondary Windows Server 2019 domain controllers, internal DNS, reverse lookup zone, baseline OU structure, dedicated Domain Admin account, Windows file server, SMB share foundation, and Veeam migration into the dedicated Backup & Recovery VLAN.
     * **Internal AD Domain:** `fort.internal`
@@ -129,31 +129,65 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
     * **DNS Transition Note:** `vcenter.home` was retained as the vCenter management alias during the migration to avoid unnecessary PNID, SSO, or certificate disruption. Future management records may be transitioned or duplicated under the `fort.internal` namespace as the domain matures.
     * **Lab Rationale:** `.internal` is used as a private internal namespace for the lab. The shorter `fort.internal` format improves administrative usability while avoiding `.local`, which can conflict with mDNS behavior.
     * **Production Note:** In a production enterprise environment, the preferred design would typically use a delegated subdomain of an owned public domain, such as `ad.ufprime.org`.
-* **Phase 3.3 - Remote Operations:** Configuration of a DMZ reverse proxy (`DC1-PROXY-01`) to handle inbound TLS termination and deployment of a WireGuard VPN tunnel endpoint for role-based remote access.
+### Phase 3: Physical Core Routing, Identity Services, & Baseline Hardening (In Progress)
 
-### Phase 4: Telemetry Pipeline & Centralized Ingestion (Planned Future State)
-* **SIEM Core Deployment:** Stand up a centralized SIEM console (`DC1-SIEM-01`) in the dedicated Security Monitoring zone.
-* **Log Aggregation:** Configure structured data collection pipelines to parse, ingest, and index core infrastructure logs:
-    * pfSense/Netgate firewall packet filter logs via Syslog.
-    * Windows Security, System, and Application logs via Windows Event Forwarding (WEF/WEC).
-    * VMware vCenter event trails and ESXi audit logs.
-    * Veeam backup job results and console access audit trails.
-* **Performance Baseline Monitoring:** Implement Zabbix infrastructure polling using restricted SNMP/WMI rules across the firewall matrix to monitor system resource metrics.
+* **Phase 3.1 - Physical Routing:** Completed deployment of the physical Netgate firewall, 10G DAC trunk to ESXi, pfSense VLAN interfaces, ESXi VLAN-backed port groups, and Tier 0 management migration for ESXi/vCenter.
 
-### Phase 5: Detection Engineering & Security Operations (Planned Future State)
-* **Endpoint Protection:** Deploy Wazuh host-based monitoring agents across all active servers in Tier 0 and Tier 1.
-* **Detection Mechanics:** Write and test custom detection rules targeting common adversary tradecraft, including:
-    * Failed authentication spikes and brute-force patterns across SSH, RDP, and WinRM.
-    * Unauthorized local administrator group additions or service creation events.
-    * Suspicious PowerShell execution flags, including encoded command strings.
-    * Lateral movement indicators and inter-VLAN firewall drops.
-* **SecOps Artifact Generation:** Document live operational playbooks, structured alert triage case notes, and mock incident reports showing timeline construction, root-cause verification, and remediation workflows.
+* **Phase 3.2 - Identity Services, File Services, & Backup Segmentation:** Completed deployment of the `fort.internal` Active Directory forest, primary and secondary Windows Server 2019 domain controllers, internal DNS, reverse lookup zone, baseline OU structure, dedicated Domain Admin account, Windows file server, SMB share foundation, and Veeam migration into the dedicated Backup & Recovery VLAN.
+    * **Internal AD Domain:** `fort.internal`
+    * **Identity Tier Note:** Domain controllers reside in the Production VLAN for this lab phase but are treated administratively as Tier 0 identity assets due to their control over authentication, DNS, Kerberos, and domain-wide policy.
+    * **DNS Transition Note:** `vcenter.home` was retained as the vCenter management alias during the migration to avoid unnecessary PNID, SSO, or certificate disruption. Future management records may be transitioned or duplicated under the `fort.internal` namespace as the domain matures.
+    * **Lab Rationale:** `.internal` is used as a private internal namespace for the lab. The shorter `fort.internal` format improves administrative usability while avoiding `.local`, which can conflict with mDNS behavior.
+    * **Production Note:** In a production enterprise environment, the preferred design would typically use a delegated subdomain of an owned public domain, such as `ad.ufprime.org`.
+
+* **Phase 3.3 - Active Directory & Infrastructure Hardening:** Planned implementation of baseline GPO enforcement, Windows LAPS, NTFS/SMB access control, service account restrictions, DNS cleanup, and firewall rule hardening before telemetry ingestion begins in Phase 4.
+    * **Tiered Administration & GPO Enforcement:** Logically separate administrative access into Tier 0, Tier 1, and Tier 2 boundaries.
+        * Tier 0 includes Domain Controllers, vCenter, ESXi, and core management systems.
+        * Tier 1 includes member servers, application servers, and file servers.
+        * Tier 2 includes future workstations, peer systems, and lower-trust endpoints.
+    * **Credential Boundary Protection:** Deploy Group Policy Objects that deny Tier 0 administrative accounts from interactive logon and RDP access to Tier 1 or Tier 2 systems.
+    * **Service Account Lockdown:** Configure service accounts with explicit logon restrictions such as “Deny log on locally” and “Deny log on through Remote Desktop Services.” Service accounts will be limited to required service or batch logon rights only.
+    * **Windows LAPS Deployment:** Extend Active Directory for Windows LAPS and deploy policy to supported domain-joined member servers and future endpoints.
+    * **Lateral Movement Risk Reduction:** Ensure local administrator passwords are unique, rotated, and securely stored in Active Directory to reduce password reuse and pass-the-hash-style lateral movement risk.
+    * **NTFS ACLs & SMB Share Hardening:** Remove bootstrap file-share permissions from `DC1-FS-01` and enforce access using AD security groups.
+        * `SG-CorporateData-Read`
+        * `SG-CorporateData-Modify`
+    * **Audit Preparation:** Enable Advanced Audit Policy Configuration and configure folder-level SACLs on selected file paths to generate meaningful object-access events for Phase 4 telemetry ingestion.
+    * **Network & DNS Cleanup:** Remove temporary “Allow All” firewall rules and temporary DHCP scopes created during VLAN validation.
+    * **DNS Hygiene:** Verify domain-joined systems use `DC1-DC-01` and `DC1-DC-02` for DNS resolution and confirm `fort.internal` resolves cleanly without dependency on legacy upstream resolvers.
+    * **Firewall Baseline Review:** Confirm default-deny inter-VLAN rules remain enforced, especially Production-to-Backup and DMZ-to-Tier-0 paths.
+
+### Phase 4: Telemetry Pipeline & Centralized Ingestion (Planned)
+
+* **Phase 4 - Telemetry Pipeline & Centralized Ingestion:** Planned deployment of a centralized logging and monitoring pipeline across core network tiers to provide reliable visibility for future detection engineering. Final SIEM/log analytics tooling remains under evaluation, with candidate platforms including Splunk, Wazuh, Elastic/Security Onion, or another suitable commercial or open-source security monitoring stack.
+    * **Security Monitoring Enclave:** Operationalize VLAN 50 by deploying the selected SIEM/log analytics stack, creating least-privilege firewall paths for telemetry sources, and validating log flow from Tier 0, Tier 1, Backup, and perimeter infrastructure.
+    * **Infrastructure Health Monitoring:** Evaluate Zabbix or a comparable monitoring platform for system availability, resource utilization, service health, and alerting.
+    * **High-Fidelity Log Aggregation:** Configure structured collection pipelines to parse, ingest, and index core infrastructure logs.
+        * pfSense/Netgate firewall traffic, deny events, and inter-VLAN rule activity via Syslog.
+        * Windows Security, System, and Application logs via Windows Event Forwarding.
+        * VMware vCenter event trails, ESXi audit logs, and Veeam operational audit trails.
+    * **Advanced Endpoint Telemetry:** Deploy Sysmon to Tier 0 and Tier 1 Windows assets to capture deeper execution telemetry such as process creation, network connections, PowerShell behavior, and LSASS access patterns.
+    * **Host-Based Security Monitoring:** Deploy the selected host-based security monitoring agent or platform to critical Tier 0 and Tier 1 assets for file integrity monitoring, vulnerability visibility, configuration monitoring, and host-level behavioral analysis.
+    * **Time Synchronization:** Enforce consistent NTP configuration across infrastructure assets to support accurate incident timeline reconstruction.
+
+### Phase 5: Detection Engineering & Security Operations (Planned)
+
+* **Phase 5 - Detection Engineering & Security Operations:** Planned operationalization of ingested telemetry through targeted detection logic, structured SOC triage workflows, and disaster recovery validation against realistic ransomware and infrastructure-compromise scenarios.
+    * **Adversary Behavior Detection:** Engineer and validate custom SIEM detection rules mapped to realistic enterprise attack patterns.
+        * Authentication anomalies, brute-force patterns, NTLM abuse indicators, and pass-the-hash-style lateral movement behavior.
+        * Unauthorized Active Directory modifications, including privileged group membership changes, local administrator additions, and unexpected service creation.
+        * Suspicious PowerShell execution, including encoded commands, obfuscated flags, and unusual parent-child process relationships.
+        * Lateral movement attempts across protected internal boundaries, including Production-to-Backup and DMZ-to-Tier-0 firewall deny events.
+    * **SOC Triage Workflows:** Develop structured alert triage notes, mock incident reports, and operational playbooks documenting timeline construction, root-cause verification, containment decisions, and remediation workflows.
+    * **Disaster Recovery Validation:** Execute a formal Veeam disaster recovery runbook, validating file-level restores and full-VM restores to prove the backup enclave can support recovery from Active Directory, file server, or hypervisor-impacting incidents.
 
 ---
 
-## Decoupled Future Projects (Out of Scope)
-Although these services are decoupled from the current Project Fortress implementation, their VLANs and routing objects are pre-provisioned during Phase 3 to preserve a clean subnet plan and avoid future address redesign.
+## Deferred Future Projects
 
-1. **Enterprise Unified Communications (VoIP) Infrastructure:** Implementation of a dedicated Voice/UC zone (`VLAN 40`), SIP trunk configurations, and deployment of an independent private branch exchange appliance.
-2. **Secure Mail Gateway & Internal Messaging Enclave:** Deployment of internal mailbox servers and edge mail security gateways for secure email hygiene testing.
-3. **Hybrid Cloud Directory Extension Architecture:** Implementation of Entra ID Connect sync, cross-premises VPN networking, and cloud-native infrastructure mapping utilizing the owned `ufprime.org` domain footprint.
+These projects are intentionally deferred until the core lab foundation, hardening baseline, telemetry pipeline, and detection workflows are complete.
+
+1. **ZTNA Peer Access & Delegated Lab Participation:** Future controlled access model for a small trusted peer group using role-based accounts, onboarding/offboarding procedures, scoped permissions, and monitored access paths.
+2. **Azure Hybrid Architecture:** Future hybrid-cloud extension using Azure networking, identity integration, and controlled connectivity to the on-premises lab.
+
+> **Deprecated Scope Note:** Legacy VoIP and internal mail gateway projects have been removed from the active roadmap to keep Project Fortress focused on infrastructure operations, security monitoring, detection engineering, and recovery validation.
