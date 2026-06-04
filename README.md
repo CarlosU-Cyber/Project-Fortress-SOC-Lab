@@ -121,6 +121,7 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
 * **Phase 2.1 - Control Plane:** Deployed vCenter Server Appliance (vCSA) 7.0 to handle centralized virtual datacenter orchestration.
 * **Phase 2.2 - Automation & DR:** Utilized VMware PowerCLI to automate VM provisioning. Constructed a Sysprepped Windows Server 2019 "Golden Image" template. Deployed and configured Veeam Backup & Replication within a standalone workgroup to secure the vCenter control plane to an Unraid NAS prior to network migration. Stabilized host hardware using an AVR UPS.
 
+
 ### Phase 3: Physical Core Routing, Identity Services, & Baseline Hardening (In Progress)
 * **Phase 3.1 - Physical Routing:** Completed deployment of the physical Netgate firewall, 10G DAC trunk to ESXi, pfSense VLAN interfaces, ESXi VLAN-backed port groups, and Tier 0 management migration for ESXi/vCenter.
 * **Phase 3.2 - Identity Services, File Services, & Backup Segmentation:** Completed deployment of the `fort.internal` Active Directory forest, primary and secondary Windows Server 2019 domain controllers, internal DNS, reverse lookup zone, baseline OU structure, dedicated Domain Admin account, Windows file server, SMB share foundation, and Veeam migration into the dedicated Backup & Recovery VLAN.
@@ -129,17 +130,6 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
     * **DNS Transition Note:** `vcenter.home` was retained as the vCenter management alias during the migration to avoid unnecessary PNID, SSO, or certificate disruption. Future management records may be transitioned or duplicated under the `fort.internal` namespace as the domain matures.
     * **Lab Rationale:** `.internal` is used as a private internal namespace for the lab. The shorter `fort.internal` format improves administrative usability while avoiding `.local`, which can conflict with mDNS behavior.
     * **Production Note:** In a production enterprise environment, the preferred design would typically use a delegated subdomain of an owned public domain, such as `ad.ufprime.org`.
-### Phase 3: Physical Core Routing, Identity Services, & Baseline Hardening (In Progress)
-
-* **Phase 3.1 - Physical Routing:** Completed deployment of the physical Netgate firewall, 10G DAC trunk to ESXi, pfSense VLAN interfaces, ESXi VLAN-backed port groups, and Tier 0 management migration for ESXi/vCenter.
-
-* **Phase 3.2 - Identity Services, File Services, & Backup Segmentation:** Completed deployment of the `fort.internal` Active Directory forest, primary and secondary Windows Server 2019 domain controllers, internal DNS, reverse lookup zone, baseline OU structure, dedicated Domain Admin account, Windows file server, SMB share foundation, and Veeam migration into the dedicated Backup & Recovery VLAN.
-    * **Internal AD Domain:** `fort.internal`
-    * **Identity Tier Note:** Domain controllers reside in the Production VLAN for this lab phase but are treated administratively as Tier 0 identity assets due to their control over authentication, DNS, Kerberos, and domain-wide policy.
-    * **DNS Transition Note:** `vcenter.home` was retained as the vCenter management alias during the migration to avoid unnecessary PNID, SSO, or certificate disruption. Future management records may be transitioned or duplicated under the `fort.internal` namespace as the domain matures.
-    * **Lab Rationale:** `.internal` is used as a private internal namespace for the lab. The shorter `fort.internal` format improves administrative usability while avoiding `.local`, which can conflict with mDNS behavior.
-    * **Production Note:** In a production enterprise environment, the preferred design would typically use a delegated subdomain of an owned public domain, such as `ad.ufprime.org`.
-
 * **Phase 3.3 - Active Directory & Infrastructure Hardening:** Planned implementation of baseline GPO enforcement, Windows LAPS, NTFS/SMB access control, service account restrictions, DNS cleanup, and firewall rule hardening before telemetry ingestion begins in Phase 4.
     * **Tiered Administration & GPO Enforcement:** Logically separate administrative access into Tier 0, Tier 1, and Tier 2 boundaries.
         * Tier 0 includes Domain Controllers, vCenter, ESXi, and core management systems.
@@ -158,7 +148,6 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
     * **Firewall Baseline Review:** Confirm default-deny inter-VLAN rules remain enforced, especially Production-to-Backup and DMZ-to-Tier-0 paths.
 
 ### Phase 4: Telemetry Pipeline & Centralized Ingestion (Planned)
-
 * **Phase 4 - Telemetry Pipeline & Centralized Ingestion:** Planned deployment of a centralized logging and monitoring pipeline across core network tiers to provide reliable visibility for future detection engineering. Final SIEM/log analytics tooling remains under evaluation, with candidate platforms including Splunk, Wazuh, Elastic/Security Onion, or another suitable commercial or open-source security monitoring stack.
     * **Security Monitoring Enclave:** Operationalize VLAN 50 by deploying the selected SIEM/log analytics stack, creating least-privilege firewall paths for telemetry sources, and validating log flow from Tier 0, Tier 1, Backup, and perimeter infrastructure.
     * **Infrastructure Health Monitoring:** Evaluate Zabbix or a comparable monitoring platform for system availability, resource utilization, service health, and alerting.
@@ -171,7 +160,6 @@ The inner datacenter utilizes a strict `10.0.x.0/24` addressing scheme, where th
     * **Time Synchronization:** Enforce consistent NTP configuration across infrastructure assets to support accurate incident timeline reconstruction.
 
 ### Phase 5: Detection Engineering & Security Operations (Planned)
-
 * **Phase 5 - Detection Engineering & Security Operations:** Planned operationalization of ingested telemetry through targeted detection logic, structured SOC triage workflows, and disaster recovery validation against realistic ransomware and infrastructure-compromise scenarios.
     * **Adversary Behavior Detection:** Engineer and validate custom SIEM detection rules mapped to realistic enterprise attack patterns.
         * Authentication anomalies, brute-force patterns, NTLM abuse indicators, and pass-the-hash-style lateral movement behavior.
